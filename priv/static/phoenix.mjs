@@ -36,9 +36,6 @@ var TRANSPORTS = {
   longpoll: "longpoll",
   websocket: "websocket"
 };
-var XHR_STATES = {
-  complete: 4
-};
 
 // js/phoenix/push.js
 var Push = class {
@@ -501,45 +498,69 @@ var Channel = class {
 // js/phoenix/ajax.js
 var Ajax = class {
   static request(method, endPoint, accept, body, timeout, ontimeout, callback) {
-    if (global.XDomainRequest) {
-      let req = new global.XDomainRequest();
-      return this.xdomainRequest(req, method, endPoint, body, timeout, ontimeout, callback);
-    } else {
-      let req = new global.XMLHttpRequest();
-      return this.xhrRequest(req, method, endPoint, accept, body, timeout, ontimeout, callback);
-    }
-  }
-  static xdomainRequest(req, method, endPoint, body, timeout, ontimeout, callback) {
-    req.timeout = timeout;
-    req.open(method, endPoint);
-    req.onload = () => {
-      let response = this.parseJSON(req.responseText);
-      callback && callback(response);
-    };
-    if (ontimeout) {
-      req.ontimeout = ontimeout;
-    }
-    req.onprogress = () => {
-    };
-    req.send(body);
-    return req;
-  }
-  static xhrRequest(req, method, endPoint, accept, body, timeout, ontimeout, callback) {
-    req.open(method, endPoint, true);
-    req.timeout = timeout;
-    req.setRequestHeader("Content-Type", accept);
-    req.onerror = () => callback && callback(null);
-    req.onreadystatechange = () => {
-      if (req.readyState === XHR_STATES.complete && callback) {
-        let response = this.parseJSON(req.responseText);
-        callback(response);
+    const controller = new AbortController();
+    const signal = controller.signal;
+    let aborted = false;
+    let timer = setTimeout(() => {
+      timer = null;
+      aborted = true;
+      controller.abort();
+      if (ontimeout) {
+        ontimeout();
+      }
+    }, timeout);
+    let promise = global.fetch(endPoint, {
+      method,
+      headers: {
+        "Content-Type": accept
+      },
+      body,
+      signal
+    });
+    promise.then((response) => {
+      if (aborted) {
+        return;
+      }
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (!response.ok) {
+        if (callback) {
+          callback(null);
+        }
+        return;
+      }
+      return response.text().then((text) => {
+        const result = this.parseJSON(text);
+        callback(result);
+      });
+    });
+    promise.catch((_error) => {
+      if (aborted) {
+        return;
+      }
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (callback) {
+        callback(null);
+      }
+    });
+    return {
+      abort: () => {
+        if (aborted) {
+          return;
+        }
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        aborted = true;
+        controller.abort();
       }
     };
-    if (ontimeout) {
-      req.ontimeout = ontimeout;
-    }
-    req.send(body);
-    return req;
   }
   static parseJSON(resp) {
     if (!resp || resp === "") {

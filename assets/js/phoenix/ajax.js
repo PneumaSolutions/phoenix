@@ -1,51 +1,71 @@
-import {
-  global,
-  XHR_STATES
-} from "./constants"
+import { global } from "./constants"
 
 export default class Ajax {
 
   static request(method, endPoint, accept, body, timeout, ontimeout, callback){
-    if(global.XDomainRequest){
-      let req = new global.XDomainRequest() // IE8, IE9
-      return this.xdomainRequest(req, method, endPoint, body, timeout, ontimeout, callback)
-    } else {
-      let req = new global.XMLHttpRequest() // IE7+, Firefox, Chrome, Opera, Safari
-      return this.xhrRequest(req, method, endPoint, accept, body, timeout, ontimeout, callback)
-    }
-  }
-
-  static xdomainRequest(req, method, endPoint, body, timeout, ontimeout, callback){
-    req.timeout = timeout
-    req.open(method, endPoint)
-    req.onload = () => {
-      let response = this.parseJSON(req.responseText)
-      callback && callback(response)
-    }
-    if(ontimeout){ req.ontimeout = ontimeout }
-
-    // Work around bug in IE9 that requires an attached onprogress handler
-    req.onprogress = () => { }
-
-    req.send(body)
-    return req
-  }
-
-  static xhrRequest(req, method, endPoint, accept, body, timeout, ontimeout, callback){
-    req.open(method, endPoint, true)
-    req.timeout = timeout
-    req.setRequestHeader("Content-Type", accept)
-    req.onerror = () => callback && callback(null)
-    req.onreadystatechange = () => {
-      if(req.readyState === XHR_STATES.complete && callback){
-        let response = this.parseJSON(req.responseText)
-        callback(response)
+    const controller = new AbortController()
+    const signal = controller.signal
+    let aborted = false
+    let timer = setTimeout(() => {
+      timer = null
+      aborted = true
+      controller.abort()
+      if (ontimeout) {
+        ontimeout()
+      }
+    }, timeout)
+    let promise = global.fetch(endPoint, {
+      method,
+      headers: {
+        "Content-Type": accept,
+      },
+      body,
+      signal,
+    })
+    promise.then(response => {
+      if (aborted) {
+        return
+      }
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      if (!response.ok) {
+        if (callback) {
+          callback(null)
+        }
+        return
+      }
+      return response.text().then(text => {
+        const result = this.parseJSON(text)
+        callback(result)
+      })
+    })
+    promise.catch(_error => {
+      if (aborted) {
+        return
+      }
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      if (callback) {
+        callback(null)
+      }
+    })
+    return {
+      abort: () => {
+        if (aborted) {
+          return
+        }
+        if (timer) {
+          clearTimeout(timer)
+          timer = null
+        }
+        aborted = true
+        controller.abort()
       }
     }
-    if(ontimeout){ req.ontimeout = ontimeout }
-
-    req.send(body)
-    return req
   }
 
   static parseJSON(resp){
