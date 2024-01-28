@@ -42,7 +42,7 @@ var Phoenix = (() => {
   // js/phoenix/constants.js
   var globalSelf = typeof self !== "undefined" ? self : null;
   var phxWindow = typeof window !== "undefined" ? window : null;
-  var global = globalSelf || phxWindow || global;
+  var phxGlobal = globalSelf || phxWindow || global;
   var DEFAULT_VSN = "2.0.0";
   var SOCKET_STATES = { connecting: 0, open: 1, closing: 2, closed: 3 };
   var DEFAULT_TIMEOUT = 1e4;
@@ -538,7 +538,7 @@ var Phoenix = (() => {
           ontimeout();
         }
       }, timeout);
-      let promise = global.fetch(endPoint, {
+      let promise = phxGlobal.fetch(endPoint, {
         method,
         headers: {
           "Content-Type": accept
@@ -1046,10 +1046,10 @@ var Phoenix = (() => {
       this.sendBuffer = [];
       this.ref = 0;
       this.timeout = opts.timeout || DEFAULT_TIMEOUT;
-      this.transport = opts.transport || global.WebSocket || LongPoll;
+      this.transport = opts.transport || phxGlobal.WebSocket || LongPoll;
       this.longPollFallbackMs = opts.longPollFallbackMs;
       this.fallbackTimer = null;
-      this.sessionStore = opts.sessionStorage || global.sessionStorage;
+      this.sessionStore = opts.sessionStorage || phxGlobal.sessionStorage;
       this.establishedConnections = 0;
       this.defaultEncoder = serializer_default.encode.bind(serializer_default);
       this.defaultDecoder = serializer_default.decode.bind(serializer_default);

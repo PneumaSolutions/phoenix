@@ -1,4 +1,4 @@
-import { global } from "./constants"
+import { phxGlobal } from "./constants"
 
 export default class Ajax {
 
@@ -14,7 +14,7 @@ export default class Ajax {
         ontimeout()
       }
     }, timeout)
-    let promise = global.fetch(endPoint, {
+    let promise = phxGlobal.fetch(endPoint, {
       method,
       headers: {
         "Content-Type": accept,
