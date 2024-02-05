@@ -729,8 +729,21 @@ var Phoenix = (() => {
         this.currentBatchTimer = setTimeout(() => {
           this.batchSend(this.currentBatch);
           this.currentBatch = null;
+          this.currentBatchTimer = null;
         }, 0);
       }
+    }
+    flush() {
+      if (!this.currentBatch && this.batchBuffer.length === 0) {
+        return;
+      }
+      if (this.currentBatchTimer) {
+        clearTimeout(this.currentBatchTimer);
+        this.currentBatchTimer = null;
+      }
+      this.batchSend(this.batchBuffer.concat(this.currentBatch || []));
+      this.batchBuffer = [];
+      this.currentBatch = null;
     }
     batchSend(messages) {
       this.awaitingBatchAck = true;
@@ -752,8 +765,10 @@ var Phoenix = (() => {
       this.readyState = SOCKET_STATES.closed;
       let opts = Object.assign({ code: 1e3, reason: void 0, wasClean: true }, { code, reason, wasClean });
       this.batchBuffer = [];
-      clearTimeout(this.currentBatchTimer);
-      this.currentBatchTimer = null;
+      if (this.currentBatchTimer) {
+        clearTimeout(this.currentBatchTimer);
+        this.currentBatchTimer = null;
+      }
       if (typeof CloseEvent !== "undefined") {
         this.onclose(new CloseEvent("close", opts));
       } else {
