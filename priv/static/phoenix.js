@@ -940,7 +940,7 @@ var Phoenix = (() => {
       }
       this.pendingHeartbeatRef = null;
       clearTimeout(this.heartbeatTimer);
-      setTimeout(() => this.sendHeartbeat(), this.heartbeatIntervalMs);
+      this.heartbeatTimer = setTimeout(() => this.sendHeartbeat(), this.heartbeatIntervalMs);
     }
     teardown(callback, code, reason) {
       if (!this.conn) {
@@ -987,6 +987,7 @@ var Phoenix = (() => {
         this.log("transport", "close", event);
       this.triggerChanError();
       clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
       if (!this.closeWasClean) {
         this.reconnectTimer.scheduleTimeout();
       }
@@ -1088,7 +1089,7 @@ var Phoenix = (() => {
         if (ref && ref === this.pendingHeartbeatRef) {
           clearTimeout(this.heartbeatTimer);
           this.pendingHeartbeatRef = null;
-          setTimeout(() => this.sendHeartbeat(), this.heartbeatIntervalMs);
+          this.heartbeatTimer = setTimeout(() => this.sendHeartbeat(), this.heartbeatIntervalMs);
         }
         if (this.hasLogger())
           this.log("receive", `${payload.status || ""} ${topic} ${event} ${ref && "(" + ref + ")" || ""}`, payload);
